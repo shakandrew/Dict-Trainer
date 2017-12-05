@@ -40,18 +40,18 @@ Choose one of the options below
             break
 
         switcher = {
-            1: get_words_list(model),
-            2: get_dict_data(model),
-            3: get_dicts_in_use(model),
-            4: get_word_data(model),
-            5: get_dict_data(model),
-            6: add_word(model),
-            7: modify_word(model),
-            8: delete_word(model),
-            9: mark_word(model),
-            10: unmark_word(model),
+            1: get_words_list,
+            2: get_dict_data,
+            3: get_dicts_in_use,
+            4: get_word_data,
+            5: get_dict_data,
+            6: add_word,
+            7: modify_word,
+            8: delete_word,
+            9: mark_word,
+            10: unmark_word
         }
-        switcher[choise]()
+        switcher[choise](model)
 
 # Next part of code doesn't work
 def get_words_list(model):

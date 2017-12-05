@@ -14,7 +14,7 @@ def singleton(cls):
     return getinstance
 
 
-#@singleton
+# @singleton
 class Model:
     def __init__(self, db_name):
         self.db_name = db_name
@@ -33,7 +33,6 @@ class Model:
         try:
             if len(self.get_word(words=(word.name, word.dict_id))) is 0:
                 return False
-
             self.cursor.execute(query, args)
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
@@ -76,27 +75,42 @@ class Model:
             self.cursor.close()
         self.conn = sqlite3.connect(self.db_name)
         self.cursor = self.conn.cursor()
+
     # TODO fix errors
     # Returns list of words
     # If words = None, it will return all words ( words = list() )
     # If marked = True, it will return only marked words ( marked = Bool )
     def get_word(self, words=None, marked=False):
         result = list()
-        suffix = None
+        suffix = ""
         if marked is True:
             suffix = Model.sql_switcher["Marked suffix"] % \
-                     {"arg1": 1} + ";"
+                     {"arg1": 1}
+        suffix += ";"
         try:
             if words is None:
-                self.cursor.execute(Model.sql_switcher["Get all words"] + suffix)
+                self.cursor.execute(Model.sql_switcher["Get all words"] +\
+                                    suffix)
                 for line in self.cursor.fetchall():
-                    result.append(Word(line[0], line[1], line[2], line[3], line[4]))
+                    result.append(Word(
+                        id=line[0],
+                        name=line[1],
+                        notes=line[2],
+                        dict_id=line[3],
+                        mark=line[4])
+                    )
             else:
                 for word in words:
-                    self.cursor.execute(Model.sql_switcher["Get word"] + suffix,
-                                        (word[0], word[1]))
+                    self.cursor.execute(Model.sql_switcher["Get word"] +\
+                                        suffix, (word[0], word[1]))
                     line = self.cursor.fetchone()[0]
-                    result.append(Word(line[0], line[1], line[2], line[3], line[4]))
+                    result.append(Word(
+                        id=line[0],
+                        name=line[1],
+                        notes=line[2],
+                        dict_id=line[3],
+                        mark=line[4])
+                    )
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
@@ -114,7 +128,7 @@ class Model:
                     result.append(Dictionary(line[0], line[1]))
             else:
                 for dictionary in dictionaries:
-                    #o = Model.sql_switcher["Get dict"].format(dictionary)
+                    # o = Model.sql_switcher["Get dict"].format(dictionary)
                     self.cursor.execute(Model.sql_switcher["Get dict"],
                                         (dictionary,))
                     line = self.cursor.fetchone()
