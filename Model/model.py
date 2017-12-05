@@ -23,15 +23,15 @@ class Model:
         self.cursor = None
         self.update_connection()
 
-        self.dict_out = self.get_dict(("English",))
-        self.dict_in = self.get_dict(("Polish",))
+        self.dict_out = self.get_dict(("English",))[0]
+        self.dict_in = self.get_dict(("Polish",))[0]
 
     def __str__(self):
         return "You are working with Data Base : " + self.db_name
 
     def word_fn(self, word, query, args):
         try:
-            if len(self.get_word(words=(word.name, word.dict_id))) is 0:
+            if len(self.get_word(word=(word.name, word.dict_id))) is 0:
                 return False
             self.cursor.execute(query, args)
         except sqlite3.DatabaseError as err:
@@ -80,37 +80,30 @@ class Model:
     # Returns list of words
     # If words = None, it will return all words ( words = list() )
     # If marked = True, it will return only marked words ( marked = Bool )
-    def get_word(self, words=None, marked=False):
-        result = list()
-        suffix = ""
+    def get_word(self, word=None, marked=False):
+        result = None
+        query = ""
         if marked is True:
-            suffix = Model.sql_switcher["Marked suffix"] % \
-                     {"arg1": 1}
-        suffix += ";"
+            query = Model.sql_switcher["Marked suffix"] % \
+                    {"arg1": 1}
         try:
-            if words is None:
-                self.cursor.execute(Model.sql_switcher["Get all words"] +\
-                                    suffix)
-                for line in self.cursor.fetchall():
-                    result.append(Word(
-                        id=line[0],
-                        name=line[1],
-                        notes=line[2],
-                        dict_id=line[3],
-                        mark=line[4])
-                    )
+            if word is None:
+                query = Model.sql_switcher["Get all words"] + query
             else:
-                for word in words:
-                    self.cursor.execute(Model.sql_switcher["Get word"] +\
-                                        suffix, (word[0], word[1]))
-                    line = self.cursor.fetchone()[0]
+                query = (Model.sql_switcher["Get word"] + query).format(word)
+
+            self.cursor.execute(query)
+            lines = self.cursor.fetchall()
+            if len(lines) != 0:
+                result = []
+                for line in lines:
                     result.append(Word(
                         id=line[0],
                         name=line[1],
                         notes=line[2],
                         dict_id=line[3],
-                        mark=line[4])
-                    )
+                        mark=line[4]
+                    ))
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
@@ -119,39 +112,45 @@ class Model:
 
     # Returns list of dictionaries
     # If dictionaries = None, it will return all dictionaries ( dictionaries = str() )
-    def get_dict(self, dictionaries=None):
-        result = list()
+    def get_dict(self, dictionary=None):
+        result = None
+        query = ""
         try:
-            if dictionaries is None:
-                self.cursor.execute(Model.sql_switcher["Get all dicts"])
-                for line in self.cursor.fetchall():
-                    result.append(Dictionary(line[0], line[1]))
+            if dictionary is None:
+                query = Model.sql_switcher["Get all dicts"]
             else:
-                for dictionary in dictionaries:
-                    # o = Model.sql_switcher["Get dict"].format(dictionary)
-                    self.cursor.execute(Model.sql_switcher["Get dict"],
-                                        (dictionary,))
-                    line = self.cursor.fetchone()
-                    result.append(Dictionary(line[0], line[1]))
+                query = Model.sql_switcher["Get dict"].format(dictionary)
+            self.cursor.execute(query)
+            lines = self.cursor.fetchall()
+            if len(lines) != 0:
+                result = []
+                for line in lines:
+                    result.append(Dictionary(
+                        id=line[0],
+                        name=line[1]
+                    ))
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
         else:
             return result
 
+    def translate_word(self, word):
+        pass
+
     sql_switcher = {
         "Add word": "INSERT INTO Word (name, notes, dict_id, mark) "
                     "VALUES (?, ?, ?, ?);",
+        "Del word": "DELETE FROM Word WHERE name=? AND dict_id=? ",
+        "Modify word": "UPDATE Word SET name=?, notes=?, dict_id=?, mark=? "
+                       "WHERE name=? AND dict_id=? ",
+        "Mark word": "UPDATE Word SET mark = 1 WHERE name=? AND dict_id=? ",
+        "Unmark word": "UPDATE Word SET mark = 0 WHERE name=? AND dict_id=? ",
+        "Marked suffix": "WHERE mark=arg1 ",
         # Note: suffix will be added, that why there is no ';'
-        "Get word": "SELECT * FROM Word WHERE name=?, dict_id=? ",
+        "Get word": "SELECT * FROM Word WHERE name={0[0]}, dict_id={0[1]} ",
         # Note: suffix will be added, that why there is no ';'
         "Get all words": "SELECT * FROM Word ",
-        "Del word": "DELETE FROM Word WHERE name=? AND dict_id=?;",
-        "Modify word": "UPDATE Word SET name=?, notes=?, dict_id=?, mark=? "
-                       "WHERE name=? AND dict_id=?",
-        "Mark word": "UPDATE Word SET mark = 1 WHERE name=? AND dict_id=?;",
-        "Unmark word": "UPDATE Word SET mark = 0 WHERE name=? AND dict_id=?;",
-        "Marked suffix": "WHERE mark=arg1",
-        "Get dict": "SELECT * FROM Dictionary WHERE name=?;",
-        "Get all dicts": "SELECT * FROM Dictionary;"
+        "Get dict": "SELECT * FROM Dictionary WHERE name={0} ",
+        "Get all dicts": "SELECT * FROM Dictionary "
     }

@@ -1,10 +1,12 @@
 class Dictionary:
-    def __init__(self, id, name):
+    def __init__(self, id=None, name=None):
         self.id = id
         self.name = name
 
     def __str__(self):
-        return "ID = " + str(self.id) + " Name = " + self.name
+        id = ("ID = {} ".format(self.id)) if self.id is not None else ""
+        name = ("Name = {} ".format(self.name)) if self.name is not None else ""
+        return id + name
 
     def __eq__(self, other):
         if other.name == self.name:
