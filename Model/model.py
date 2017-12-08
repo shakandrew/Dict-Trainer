@@ -1,6 +1,6 @@
 import sqlite3
 
-from Model.dict_objs import Word, Dictionary
+from Model.dict_objs import Word, Dictionary, Translation
 
 
 def singleton(cls):
@@ -29,9 +29,12 @@ class Model:
     def __str__(self):
         return "You are working with Data Base : " + self.db_name
 
-    def word_fn(self, word, query, args):
+    def word_fn(self, query, args=None):
         try:
-            self.cursor.execute(query, args)
+            if args is None:
+                self.cursor.execute(query)
+            else:
+                self.cursor.execute(query, args)
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nWhile trying to execute:\n" + \
                   query + "\nDataBase connection has been reloaded")
@@ -41,44 +44,76 @@ class Model:
             self.conn.commit()
             return True
 
-    def add_word(self, word):
-        if self.get_word(word=(word.name, word.dict_id)) is not None:
-            return None
-        return self.word_fn(word,
-                            self.sql_switcher["Add word"],
-                            (word.name, word.notes, word.dict_id, word.mark))
+    def add_word(self, word, query=None):
+        if query is None:
+            query = self.sql_switcher["Add word"]
 
-    def del_word(self, word):
         if self.get_word(word=(word.name, word.dict_id)) is None:
+            return self.word_fn(query,
+                                args=(word.name, word.notes, word.dict_id, word.mark))
+        else:
             return None
-        return self.word_fn(word,
-                            self.sql_switcher["Del word"],
-                            (word.name, word.dict_id))
 
-    def modify_word(self, word_old, word_new):
-        if (word_old.dict_id != word_new.dict_id and self.get_word(
-                word=(word_new.name, word_new.dict_id)) is not None) or \
-                        self.get_word(word=(word_old.name, word_old.dict_id)) is None:
+    def del_word(self, word, query=None):
+        if query is None:
+            query = self.sql_switcher["Del word"]
+
+        if self.get_word(word=(word.name, word.dict_id)) is not None:
+            return self.word_fn(query,
+                                args=(word.name, word.dict_id))
+        else:
             return None
-        return self.word_fn(word_new,
-                            self.sql_switcher["Modify word"],
-                            (word_new.name, word_new.notes,
-                             word_new.dict_id, word_new.mark,
-                             word_old.name, word_old.dict_id))
+
+    # If you made a mistake by adding the word, you should delete wrong word and add new one
+    # In modify method you can change notes and mark
+    def modify_word(self, word, new_notes=None, new_mark=None, query=None):
+        if query is None:
+            query = self.sql_switcher["Modify word"]
+
+        temp = self.get_word(word=(word.name, word.dict_id))
+        if temp is not None:
+            if new_notes is None:
+                new_notes = temp[0].notes
+            if new_mark is None:
+                new_mark = temp[0].mark
+
+            return self.word_fn(query,
+                                args=(new_notes, new_mark, word.name, word.dict_id))
+        else:
+            return None
 
     def mark_word(self, word):
-        if self.get_word((word.name, word.dict_id)) is None:
-            return None
-        return self.word_fn(word,
-                            self.sql_switcher["Mark word"],
-                            (word.name, word.dict_id))
+        self.modify_word(word, new_mark=1, query=self.sql_switcher["Mark word"])
 
     def unmark_word(self, word):
-        if self.get_word((word.name, word.dict_id)) is None:
-            return None
-        return self.word_fn(word,
-                            self.sql_switcher["Unmark word"],
-                            (word.name, word.dict_id))
+        self.modify_word(word, new_mark=0, query=self.sql_switcher["Unmark word"])
+
+    # TODO some error may occure there
+    def add_translation(self, word1, word2):
+        word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
+        word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
+        transl =  self.get_translation(word1.id)
+        if word1 is not None and word2 is not None:
+            try:
+                if transl is not None and word2.id not in transl:
+                    return None
+                self.cursor.execute(Model.sql_switcher["Add translation"],
+                                    word1.id, word2.id)
+            except sqlite3.DatabaseError as err:
+                print("Error: " + str(err) + \
+                      "\nWhile trying to Add translation + \nDataBase connection has been reloaded")
+                self.update_connection()
+                return None
+            else:
+                return True
+
+    def del_translation(self, word1, word2):
+        pass
+
+    def close(self):
+        self.conn.commit()
+        self.cursor.close()
+        self.conn.close()
 
     def update_connection(self):
         if self.cursor is not None:
@@ -88,7 +123,6 @@ class Model:
         self.conn = sqlite3.connect(self.db_name)
         self.cursor = self.conn.cursor()
 
-    # TODO fix errors
     # Returns list of word(s) | None if no data
     # If words = None, it will return all words ( words = list() )
     # If marked = True, it will return only marked words ( marked = Bool )
@@ -146,19 +180,31 @@ class Model:
         else:
             return result
 
-    def translate_word(self, word):
-        pass
-
-    def close(self):
-        self.conn.commit()
-        self.cursor.close()
-        self.conn.close()
+    def get_translation(self, word=None):
+        result = None
+        query = ""
+        try:
+            if word is None:
+                query = Model.sql_switcher["Get all translations"]
+            else:
+                query = Model.sql_switcher["Get translation"].format(word)
+            self.cursor.execute(query)
+            lines = self.cursor.fetchall()
+            if len(lines) != 0:
+                result = []
+                for line in lines:
+                    result.append(Translation(line[0], line[1]))
+        except sqlite3.DatabaseError as err:
+            print("Error: " + str(err) + "\nDataBase connection has been reloaded")
+            self.update_connection()
+        else:
+            return result
 
     sql_switcher = {
         "Add word": "INSERT INTO Word (name, notes, dict_id, mark) "
                     "VALUES (?, ?, ?, ?);",
         "Del word": "DELETE FROM Word WHERE name=? AND dict_id=? ",
-        "Modify word": "UPDATE Word SET name=?, notes=?, dict_id=?, mark=? "
+        "Modify word": "UPDATE Word SET notes=?, mark=? "
                        "WHERE name=? AND dict_id=? ",
         "Mark word": "UPDATE Word SET mark = 1 WHERE name=? AND dict_id=? ",
         "Unmark word": "UPDATE Word SET mark = 0 WHERE name=? AND dict_id=? ",
@@ -168,5 +214,7 @@ class Model:
         # Note: suffix will be added, that why there is no ';'
         "Get all words": "SELECT * FROM Word ",
         "Get dict": "SELECT * FROM Dictionary WHERE name='{0}' ",
-        "Get all dicts": "SELECT * FROM Dictionary "
+        "Get all dicts": "SELECT * FROM Dictionary ",
+        "Get translation": "TODO"
+
     }
