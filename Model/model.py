@@ -29,7 +29,7 @@ class Model:
     def __str__(self):
         return "You are working with Data Base : " + self.db_name
 
-    def word_fn(self, query, args=None):
+    def exec_fn(self, query, args=None):
         try:
             if args is None:
                 self.cursor.execute(query)
@@ -49,7 +49,7 @@ class Model:
             query = self.sql_switcher["Add word"]
 
         if self.get_word(word=(word.name, word.dict_id)) is None:
-            return self.word_fn(query,
+            return self.exec_fn(query,
                                 args=(word.name, word.notes, word.dict_id, word.mark))
         else:
             return None
@@ -59,7 +59,7 @@ class Model:
             query = self.sql_switcher["Del word"]
 
         if self.get_word(word=(word.name, word.dict_id)) is not None:
-            return self.word_fn(query,
+            return self.exec_fn(query,
                                 args=(word.name, word.dict_id))
         else:
             return None
@@ -77,7 +77,7 @@ class Model:
             if new_mark is None:
                 new_mark = temp[0].mark
 
-            return self.word_fn(query,
+            return self.exec_fn(query,
                                 args=(new_notes, new_mark, word.name, word.dict_id))
         else:
             return None
@@ -88,27 +88,26 @@ class Model:
     def unmark_word(self, word):
         self.modify_word(word, new_mark=0, query=self.sql_switcher["Unmark word"])
 
-    # TODO some error may occure there
+    # TODO some error may occur there
     def add_translation(self, word1, word2):
         word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
         word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
-        transl =  self.get_translation(word1.id)
         if word1 is not None and word2 is not None:
-            try:
-                if transl is not None and word2.id not in transl:
-                    return None
-                self.cursor.execute(Model.sql_switcher["Add translation"],
-                                    word1.id, word2.id)
-            except sqlite3.DatabaseError as err:
-                print("Error: " + str(err) + \
-                      "\nWhile trying to Add translation + \nDataBase connection has been reloaded")
-                self.update_connection()
-                return None
-            else:
-                return True
+            transl = self.get_translation(word2)
+            if transl is None or (word1.id, word2.id) not in transl:
+                return self.exec_fn(self.sql_switcher["Add translation"],
+                                    (word1.id, word2.id))
+        return None
 
     def del_translation(self, word1, word2):
-        pass
+        word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
+        word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
+        if word1 is not None and word2 is not None:
+            transl = self.get_translation(word2)
+            if transl is not None and (word1.id, word2.id) in transl:
+                return self.exec_fn(self.sql_switcher["Del translation"],
+                                    (word1.id, word2.id))
+        return None
 
     def close(self):
         self.conn.commit()
@@ -209,12 +208,16 @@ class Model:
         "Mark word": "UPDATE Word SET mark = 1 WHERE name=? AND dict_id=? ",
         "Unmark word": "UPDATE Word SET mark = 0 WHERE name=? AND dict_id=? ",
         "Marked suffix": "WHERE mark={} ",
+        "Add translation": "INSERT INTO Translation VALUES (?,?)",
+        "Del translation": "DELETE FROM Translation WHERE id_1=? and id_2=?",
+        # <GETBLOCK>
         # Note: suffix will be added, that why there is no ';'
         "Get word": "SELECT * FROM Word WHERE name='{0[0]}' AND dict_id={0[1]} ",
         # Note: suffix will be added, that why there is no ';'
         "Get all words": "SELECT * FROM Word ",
         "Get dict": "SELECT * FROM Dictionary WHERE name='{0}' ",
         "Get all dicts": "SELECT * FROM Dictionary ",
-        "Get translation": "TODO"
-
+        "Get translation": "SELECT * FROM Translation WHERE id_1=? and id_2=?",
+        "Get all translations": "SELECT * FROM Translation"
+        # </GETBLOCK>
     }
