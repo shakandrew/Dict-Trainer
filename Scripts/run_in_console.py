@@ -5,12 +5,6 @@ bye_message = "Thank you. Bye."
 
 
 def main():
-    answer = input("If you want to try console version of this application, write yes : ")
-    answer = answer.lower().strip()
-    if answer != "yes":
-        print(bye_message)
-        return
-
     model = Model("../Resources/dict_db")
 
     while True:
@@ -156,7 +150,6 @@ def unmark_word(model):
 def stop(model):
     print("Ty for using this dict")
     model.close()
-
 
 if __name__ == "__main__":
     main()

@@ -93,8 +93,8 @@ class Model:
         word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
         word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
         if word1 is not None and word2 is not None:
-            transl = self.get_translation(word2)
-            if transl is None or (word1.id, word2.id) not in transl:
+            transl = self.get_translation((word1.id, word2.id))
+            if transl is None or Translation(word1.id, word2.id) not in transl:
                 return self.exec_fn(self.sql_switcher["Add translation"],
                                     (word1.id, word2.id))
         return None
@@ -103,7 +103,7 @@ class Model:
         word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
         word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
         if word1 is not None and word2 is not None:
-            transl = self.get_translation(word2)
+            transl = self.get_translation((word1.id, word2.id))
             if transl is not None and (word1.id, word2.id) in transl:
                 return self.exec_fn(self.sql_switcher["Del translation"],
                                     (word1.id, word2.id))
@@ -122,6 +122,7 @@ class Model:
         self.conn = sqlite3.connect(self.db_name)
         self.cursor = self.conn.cursor()
 
+    # Expects None or (word.name, word.dict_id)
     # Returns list of word(s) | None if no data
     # If words = None, it will return all words ( words = list() )
     # If marked = True, it will return only marked words ( marked = Bool )
@@ -179,14 +180,14 @@ class Model:
         else:
             return result
 
-    def get_translation(self, word=None):
+    def get_translation(self, translation=None):
         result = None
         query = ""
         try:
-            if word is None:
+            if translation is None:
                 query = Model.sql_switcher["Get all translations"]
             else:
-                query = Model.sql_switcher["Get translation"].format(word)
+                query = Model.sql_switcher["Get translation"].format(translation)
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
             if len(lines) != 0:
@@ -217,7 +218,7 @@ class Model:
         "Get all words": "SELECT * FROM Word ",
         "Get dict": "SELECT * FROM Dictionary WHERE name='{0}' ",
         "Get all dicts": "SELECT * FROM Dictionary ",
-        "Get translation": "SELECT * FROM Translation WHERE id_1=? and id_2=?",
+        "Get translation": "SELECT * FROM Translation WHERE id_1={0[0]} and id_2={0[1]}",
         "Get all translations": "SELECT * FROM Translation"
         # </GETBLOCK>
     }
