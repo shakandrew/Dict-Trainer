@@ -1,6 +1,6 @@
 import sqlite3
 
-from Model.dict_objs import Word, Dictionary, Translation
+from DBAPI.db_api_obejcts import Word, Dictionary, Translation
 
 
 def singleton(cls):
@@ -15,7 +15,7 @@ def singleton(cls):
 
 
 # @singleton
-class Model:
+class DBApi:
     def __init__(self, db_name):
         self.db_name = db_name
 
@@ -44,28 +44,33 @@ class Model:
             self.conn.commit()
             return True
 
+    # Add word into the DB
+    # IN : object of Word() / str query
+    # OUT : None/True
     def add_word(self, word, query=None):
         if query is None:
             query = self.sql_switcher["Add word"]
 
         if self.get_word(word=(word.name, word.dict_id)) is None:
-            return self.exec_fn(query,
-                                args=(word.name, word.notes, word.dict_id, word.mark))
+            return self.exec_fn(query, args=(word.name, word.notes, word.dict_id, word.mark))
         else:
             return None
 
+    # Deletes word from the DB
+    # IN : object of Word() / str query
+    # OUT : None/True
     def del_word(self, word, query=None):
         if query is None:
             query = self.sql_switcher["Del word"]
 
         if self.get_word(word=(word.name, word.dict_id)) is not None:
-            return self.exec_fn(query,
-                                args=(word.name, word.dict_id))
+            return self.exec_fn(query, args=(word.name, word.dict_id))
         else:
             return None
 
-    # If you made a mistake by adding the word, you should delete wrong word and add new one
-    # In modify method you can change notes and mark
+    # Modify word in the DB
+    # IN : object of Word() / str new_notes / 1\0 new_mark / str query
+    # OUT : None/True
     def modify_word(self, word, new_notes=None, new_mark=None, query=None):
         if query is None:
             query = self.sql_switcher["Modify word"]
@@ -82,13 +87,18 @@ class Model:
         else:
             return None
 
+    # Mark word in the DB
+    # IN : object of Word()
+    # OUT : None/True
     def mark_word(self, word):
         self.modify_word(word, new_mark=1, query=self.sql_switcher["Mark word"])
 
+    # Modify word in the DB
+    # IN : object of Word()
+    # OUT : None/True
     def unmark_word(self, word):
         self.modify_word(word, new_mark=0, query=self.sql_switcher["Unmark word"])
 
-    # TODO some error may occur there
     def add_translation(self, word1, word2):
         word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
         word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
@@ -130,12 +140,12 @@ class Model:
         result = None
         query = ""
         if marked is True:
-            query = Model.sql_switcher["Marked suffix"].format(1)
+            query = DBApi.sql_switcher["Marked suffix"].format(1)
         try:
             if word is None:
-                query = Model.sql_switcher["Get all words"] + query
+                query = DBApi.sql_switcher["Get all words"] + query
             else:
-                query = (Model.sql_switcher["Get word"] + query).format(word)
+                query = (DBApi.sql_switcher["Get word"] + query).format(word)
 
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
@@ -162,9 +172,9 @@ class Model:
         query = ""
         try:
             if dictionary is None:
-                query = Model.sql_switcher["Get all dicts"]
+                query = DBApi.sql_switcher["Get all dicts"]
             else:
-                query = Model.sql_switcher["Get dict"].format(dictionary)
+                query = DBApi.sql_switcher["Get dict"].format(dictionary)
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
             if len(lines) != 0:
@@ -185,9 +195,9 @@ class Model:
         query = ""
         try:
             if translation is None:
-                query = Model.sql_switcher["Get all translations"]
+                query = DBApi.sql_switcher["Get all translations"]
             else:
-                query = Model.sql_switcher["Get translation"].format(translation)
+                query = DBApi.sql_switcher["Get translation"].format(translation)
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
             if len(lines) != 0:

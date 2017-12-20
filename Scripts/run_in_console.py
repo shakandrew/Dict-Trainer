@@ -1,11 +1,11 @@
-from Model.dict_objs import Word
-from Model.model import Model
+from DBAPI.db_api_obejcts import Word
+from DBAPI.db_api import DBApi
 
 bye_message = "Thank you. Bye."
 
 
 def main():
-    model = Model("../Resources/dict_db")
+    model = DBApi("../Resources/dict_db")
 
     while True:
         try:
