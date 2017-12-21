@@ -23,9 +23,6 @@ class DBApi:
         self.cursor = None
         self.update_connection()
 
-        self.dict_out = self.get_dict("English")[0]
-        self.dict_in = self.get_dict("Polish")[0]
-
     def __str__(self):
         return "You are working with Data Base : " + self.db_name
 
@@ -39,10 +36,8 @@ class DBApi:
             print("Error: " + str(err) + "\nWhile trying to execute:\n" + \
                   query + "\nDataBase connection has been reloaded")
             self.update_connection()
-            return None
         else:
             self.conn.commit()
-            return True
 
     # Add word into the DB
     # IN : object of Word() / str query
@@ -50,11 +45,8 @@ class DBApi:
     def add_word(self, word, query=None):
         if query is None:
             query = self.sql_switcher["Add word"]
-
-        if self.get_word(word=(word.name, word.dict_id)) is None:
-            return self.exec_fn(query, args=(word.name, word.notes, word.dict_id, word.mark))
-        else:
-            return None
+        if self.get_word([], word=(word.name, word.dict_id)):
+            self.exec_fn(query, args=(word.name, word.notes, word.dict_id, word.mark))
 
     # Deletes word from the DB
     # IN : object of Word() / str query
@@ -62,11 +54,8 @@ class DBApi:
     def del_word(self, word, query=None):
         if query is None:
             query = self.sql_switcher["Del word"]
-
-        if self.get_word(word=(word.name, word.dict_id)) is not None:
-            return self.exec_fn(query, args=(word.name, word.dict_id))
-        else:
-            return None
+        if self.get_word([], word=(word.name, word.dict_id)):
+            self.exec_fn(query, args=(word.name, word.dict_id))
 
     # Modify word in the DB
     # IN : object of Word() / str new_notes / 1\0 new_mark / str query
@@ -74,18 +63,13 @@ class DBApi:
     def modify_word(self, word, new_notes=None, new_mark=None, query=None):
         if query is None:
             query = self.sql_switcher["Modify word"]
-
-        temp = self.get_word(word=(word.name, word.dict_id))
-        if temp is not None:
+        temp = self.get_word([], word=(word.name, word.dict_id))
+        if temp:
             if new_notes is None:
                 new_notes = temp[0].notes
             if new_mark is None:
                 new_mark = temp[0].mark
-
-            return self.exec_fn(query,
-                                args=(new_notes, new_mark, word.name, word.dict_id))
-        else:
-            return None
+            self.exec_fn(query, args=(new_notes, new_mark, word.name, word.dict_id))
 
     # Mark word in the DB
     # IN : object of Word()
@@ -100,23 +84,29 @@ class DBApi:
         self.modify_word(word, new_mark=0, query=self.sql_switcher["Unmark word"])
 
     def add_translation(self, word1, word2):
-        word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
-        word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
-        if word1 is not None and word2 is not None:
-            transl = self.get_translation((word1.id, word2.id))
-            if transl is None or Translation(word1.id, word2.id) not in transl:
-                return self.exec_fn(self.sql_switcher["Add translation"],
-                                    (word1.id, word2.id))
+        if word1 and word2:
+            # pair word_1 - word_2
+            transl = self.get_translation((word1, word2))
+            if not transl:
+                self.exec_fn(self.sql_switcher["Add translation"], args=(word1, word2))
+            # pair word_2 - word_1
+            transl = self.get_translation((word2, word1))
+            if not transl:
+                self.exec_fn(self.sql_switcher["Add translation"], args=(word2, word1))
+
         return None
 
     def del_translation(self, word1, word2):
-        word1 = self.get_word(word=(word1.name, word1.dict_id))[0]
-        word2 = self.get_word(word=(word2.name, word2.dict_id))[0]
-        if word1 is not None and word2 is not None:
-            transl = self.get_translation((word1.id, word2.id))
-            if transl is not None and (word1.id, word2.id) in transl:
-                return self.exec_fn(self.sql_switcher["Del translation"],
-                                    (word1.id, word2.id))
+        if word1 and word2:
+            # pair word_1 - word_2
+            transl = self.get_translation((word1, word2))
+            if transl:
+                self.exec_fn(self.sql_switcher["Del translation"], args=(word1, word2))
+            # pair word_2 - word_1
+            transl = self.get_translation((word2, word1))
+            if transl:
+                self.exec_fn(self.sql_switcher["Del translation"], args=(word2, word1))
+
         return None
 
     def close(self):
@@ -136,8 +126,7 @@ class DBApi:
     # Returns list of word(s) | None if no data
     # If words = None, it will return all words ( words = list() )
     # If marked = True, it will return only marked words ( marked = Bool )
-    def get_word(self, word=None, marked=False):
-        result = None
+    def get_word(self, collection, word=None, marked=False):
         query = ""
         if marked is True:
             query = DBApi.sql_switcher["Marked suffix"].format(1)
@@ -149,26 +138,20 @@ class DBApi:
 
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
-            if len(lines) != 0:
-                result = []
-                for line in lines:
-                    result.append(Word(
-                        id=line[0],
-                        name=line[1],
-                        notes=line[2],
-                        dict_id=line[3],
-                        mark=line[4]
-                    ))
+            for line in lines:
+                collection = self.to_collection(
+                    collection,
+                    Word(id=line[0], name=line[1], notes=line[2], dict_id=line[3], mark=line[4])
+                )
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
         else:
-            return result
+            return collection
 
     # Returns list of dictionary(-ies) | None if no data
     # If dictionaries = None, it will return all dictionaries ( dictionaries = str() )
-    def get_dict(self, dictionary=None):
-        result = None
+    def get_dict(self, collection, dictionary=None):
         query = ""
         try:
             if dictionary is None:
@@ -177,21 +160,19 @@ class DBApi:
                 query = DBApi.sql_switcher["Get dict"].format(dictionary)
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
-            if len(lines) != 0:
-                result = []
-                for line in lines:
-                    result.append(Dictionary(
-                        id=line[0],
-                        name=line[1]
-                    ))
+            for line in lines:
+                collection = self.to_collection(
+                    collection,
+                    Dictionary(id=line[0], name=line[1])
+                )
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
         else:
-            return result
+            return collection
 
     def get_translation(self, translation=None):
-        result = None
+        result = []
         query = ""
         try:
             if translation is None:
@@ -200,15 +181,20 @@ class DBApi:
                 query = DBApi.sql_switcher["Get translation"].format(translation)
             self.cursor.execute(query)
             lines = self.cursor.fetchall()
-            if len(lines) != 0:
-                result = []
-                for line in lines:
-                    result.append(Translation(line[0], line[1]))
+            for line in lines:
+                result.append(Translation(line[0], line[1]))
         except sqlite3.DatabaseError as err:
             print("Error: " + str(err) + "\nDataBase connection has been reloaded")
             self.update_connection()
         else:
             return result
+
+    def to_collection(self, collection, obj):
+        if type(collection) == type([]):
+            collection.append(obj)
+        if type(collection) == type({}):
+            collection[obj.id] = obj
+        return collection
 
     sql_switcher = {
         "Add word": "INSERT INTO Word (name, notes, dict_id, mark) "

@@ -3,7 +3,7 @@ from DBAPI.db_api import DBApi
 
 bye_message = "Thank you. Bye."
 
-
+# THIS SCRIPT MUST BE REWRITTEN
 def main():
     model = DBApi("../Resources/dict_db")
 
