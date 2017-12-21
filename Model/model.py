@@ -3,6 +3,7 @@ import random
 from PyQt5.QtCore import QAbstractItemModel
 
 from DBAPI.db_api import DBApi
+from DBAPI.db_api_obejcts import *
 
 
 # from DBAPI.db_api_obejcts import *
@@ -25,7 +26,11 @@ class Model(QAbstractItemModel):
         return self.api.get_dict([])
 
     def get_word(self, word_name):
-        return self.api.get_word([], word_name, self.dict_from)[0]
+        word = self.api.get_word([], (word_name, self.dict_from.id))
+        if word:
+            return word[0]
+        else:
+            return None
 
     def get_word_all(self):
         return self.api.get_word([])
@@ -34,6 +39,16 @@ class Model(QAbstractItemModel):
         words = self.get_translation_pairs()
         if word_name in words:
             return words[word_name]
+
+    def add_word(self, word):
+        self.api.add_word(Word(word, self.dict_from.id))
+
+    def delete_word(self, word):
+        self.api.del_word(Word(word, self.dict_from.id))
+
+    def modify_word(self, word, new_notes, new_mark):
+        self.api.modify_word(Word(word, self.dict_from.id),
+                             new_notes=new_notes, new_mark=new_mark)
 
     # Returns str or None
     def get_random_word(self):
@@ -45,7 +60,7 @@ class Model(QAbstractItemModel):
 
     def check_word_translation(self, word_from, word_to):
         words = self.get_translation_pairs(marked=True)
-        if (word_from in words and words[word_from] == word_to ) or \
+        if (word_from in words and words[word_from] == word_to) or \
                 (word_to in words and words[word_to] == word_from):
             return True
         else:
